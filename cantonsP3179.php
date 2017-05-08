@@ -9,10 +9,10 @@ $config = \json_decode( \file_get_contents( __DIR__ . '/config.WikiProjectFrance
 
 require __DIR__ . '/vendor/autoload.php';
 
-$api = new \GuzzleHttp\Client( [ 'base_uri' => 'https://www.wikidata.org/', 'cookies' => true, 'headers' => [ 'User-Agent' => 'WikiProjectFranceBot, by [[:d:User:Alphos]]' ] ] );
+$api = new \GuzzleHttp\Client( [ 'base_uri' => 'https://www.wikidata.org/', 'cookies' => true, 'headers' => [ 'User-Agent' => 'WikiProjectFranceBot P3179 canton, by [[:d:User:Alphos]]' ] ] );
 
 // Easy API response formatting, user-account edit assertion
-$format         = [ 'format' => 'json', 'formatversion' => 2 ];
+$format = [ 'format' => 'json', 'formatversion' => 2 ];
 /* * ******************
  *       Login       *
  * ****************** */
@@ -24,7 +24,7 @@ if ( !isset( $lgtokenRequest[ 'login' ][ 'token' ] ) ) {
     echo "Invalid format for the first login attempt, exiting...\n";
     return;
 }
-$lgtoken           = $lgtokenRequest[ 'login' ][ 'token' ];
+$lgtoken = $lgtokenRequest[ 'login' ][ 'token' ];
 // Then send the actual login request with the login token
 $api->request( 'POST', 'w/api.php', [
     'form_params' => $config[ 'lg' ] + [ 'lgtoken' => $lgtoken ] + [ 'action' => 'login' ] + $format
@@ -41,16 +41,16 @@ if ( !isset( $loginCheckRequest[ 'query' ][ 'userinfo' ][ 'name' ] ) || ( $login
 echo "Logged in as {$config[ 'lg' ][ 'lgname' ]}\n";
 // Setting an additional bit so requests from now on will be assumed as performed while logged in
 $format[ 'assert' ] = 'user';
-/* * ************************
- * Acquiring an edit token *
- * ************************ */
-$editTokenRequest = \json_decode( $x                = $api->request( 'POST', 'w/api.php',
-                [
-            'form_params' => [
-        'action' => 'query',
-        'meta'   => 'tokens'
+
+/**************************
+* Acquiring an edit token *
+**************************/
+$editTokenRequest = \json_decode( $x                = $api->request( 'POST', 'w/api.php', [
+        'form_params' => [
+                'action' => 'query',
+                'meta'   => 'tokens'
             ] + $format
-        ] )->getBody(), true );
+    ] )->getBody(), true );
 if ( !isset( $editTokenRequest[ 'query' ][ 'tokens' ][ 'csrftoken' ] ) ) {
     echo "Couldn't acquire an edit token, exiting...\n";
     return;
@@ -58,10 +58,10 @@ if ( !isset( $editTokenRequest[ 'query' ][ 'tokens' ][ 'csrftoken' ] ) ) {
 $editToken = $editTokenRequest[ 'query' ][ 'tokens' ][ 'csrftoken' ];
 echo "Edit token acquired : $editToken\n";
 
-/* * *************************
- * Getting lists of cantons *
- * ************************* */
-$sparQLClient = new \GuzzleHttp\Client( [ 'base_uri' => 'https://query.wikidata.org', 'headers' => [ 'User-Agent' => 'RollBot v0.1, by [[:fr:User:Alphos]]', 'Accept' => 'application/sparql-results+json',
+/***************************
+* Getting lists of cantons *
+***************************/
+$sparQLClient = new \GuzzleHttp\Client( [ 'base_uri' => 'https://query.wikidata.org', 'headers' => [ 'User-Agent' => 'WikiProjectFranceBot P3179 canton, by [[:fr:User:Alphos]]', 'Accept' => 'application/sparql-results+json',
         'Content-Type' => 'application/sparql-query' ] ] );
 
 // Get a list of old and new cantons, in order to add a P794("as") qualifier
@@ -70,12 +70,14 @@ SELECT DISTINCT ?oldcanton WHERE {
   ?oldcanton wdt:P31 wd:Q184188 .
 } ORDER BY ?oldcanton
 OLDCANTONS;
-$oldCantons       = \array_map( function( $s ) {
-    return \str_replace( 'http://www.wikidata.org/entity/', '', $s );
-},
-        \array_column( \array_column( \json_decode( $sparQLClient->request( 'POST', '/sparql',
-                                        [ 'form_params' => ['query' => $oldCantonsSparQL, 'format' => 'json' ] ] )->getBody(), true )[ 'results' ][ 'bindings' ],
-                        'oldcanton' ), 'value' ) );
+$oldCantons = \array_map( function( $s ) { return \str_replace( 'http://www.wikidata.org/entity/', '', $s ); },
+        \array_column(
+            \array_column( \json_decode( $sparQLClient->request( 'POST', '/sparql', [
+                    [ 'form_params' => ['query' => $oldCantonsSparQL, 'format' => 'json' ] 
+                ] )->getBody(), true )[ 'results' ][ 'bindings' ],
+            'oldcanton' ),
+        'value' )
+    );
 echo \count( $oldCantons ), " anciens cantons\n";
 
 $newCantonsSparQL = <<<NEWCANTONS
@@ -83,18 +85,21 @@ SELECT DISTINCT ?newcanton WHERE {
   ?newcanton wdt:P31 wd:Q18524218 .
 } ORDER BY ?newcanton
 NEWCANTONS;
-$newCantons       = \array_map( function( $s ) {
-    return \str_replace( 'http://www.wikidata.org/entity/', '', $s );
-},
-        \array_column( \array_column( \json_decode( $sparQLClient->request( 'POST', '/sparql',
-                                        [ 'form_params' => ['query' => $newCantonsSparQL, 'format' => 'json' ] ] )->getBody(), true )[ 'results' ][ 'bindings' ],
-                        'newcanton' ), 'value' ) );
+$newCantons = \array_map( function( $s ) { return \str_replace( 'http://www.wikidata.org/entity/', '', $s ); },
+        \array_column( 
+            \array_column(
+                \json_decode( $sparQLClient->request( 'POST', '/sparql', [
+                    'form_params' => ['query' => $newCantonsSparQL, 'format' => 'json' ]
+                ] )->getBody(), true )[ 'results' ][ 'bindings' ],
+            'newcanton' ),
+        'value' )
+    );
 echo count( $newCantons ), " nouveaux cantons\n";
 
-/* * ********************************************************************************
- * Getting the list of communes and the cantons they're linked to, with qualifiers *
- * ******************************************************************************** */
-$communesSparQL         = <<<COMMUNES
+/**********************************************************************************
+* Getting the list of communes and the cantons they're linked to, with qualifiers *
+**********************************************************************************/
+$communesSparQL = <<<COMMUNES
 SELECT DISTINCT ?commune ?canton ?qualProp ?time ?precision ?timezone ?calendar WHERE {
   ?commune p:P31/ps:P31/wdt:P279* wd:Q484170 .
   ?commune p:P131 ?cantonStmt .
@@ -106,14 +111,15 @@ SELECT DISTINCT ?commune ?canton ?qualProp ?time ?precision ?timezone ?calendar 
     ?qualProp wikibase:qualifierValue ?qualifier .
     ?qualVal wikibase:timePrecision ?precision ;
              wikibase:timeValue ?time ;
-  	         wikibase:timeTimezone ?timezone ;
+  	     wikibase:timeTimezone ?timezone ;
              wikibase:timeCalendarModel ?calendar ;
   }
 }
 ORDER BY ASC(?commune) ASC(?canton)
 COMMUNES;
-$communesSparQLResponse = \json_decode( $sparQLClient->request( 'POST', '/sparql', [ 'form_params' => ['query' => $communesSparQL, 'format' => 'json' ] ] )->getBody(),
-                true )[ 'results' ][ 'bindings' ];
+$communesSparQLResponse = \json_decode( $sparQLClient->request( 'POST', '/sparql', [
+        'form_params' => [ 'query' => $communesSparQL, 'format' => 'json' ]
+    ] )->getBody(), true )[ 'results' ][ 'bindings' ];
 
 /* * *
  * Getting a formatted list of commune-canton associations with qualifiers
@@ -182,25 +188,25 @@ foreach ( $communes as $communeQid => $commune ) {
         foreach ( $communeCantonQualifiers as $qualifier ) {
             // Each element in the $communeCantonQualifiers list is a [Property,Value] array (two elements, [0] and [1], not key => value)
             // Adding the qualifier to the new claim, by claim id
-            $cantonCommuneQualifier = \json_decode( $api->request( 'POST', 'w/api.php',
-                [ 'form_params' =>
+            $cantonCommuneQualifier = \json_decode( $api->request( 'POST', 'w/api.php', [
+                'form_params' =>
                     [
                         'action'   => 'wbsetqualifier',
                         'claim'    => $cantonCommuneClaimId,
-                        'property' => $qualifier[ 0 ],
-                        'value'    => $qualifier[ 1 ],
+                        'property' => $qualifier[0],
+                        'value'    => $qualifier[1],
                         'snaktype' => 'value',
                         'bot'      => 1
                     ] + $format + $editToken 
                 ] ), true );
             if ( ( !isset( $cantonCommuneQualifier[ 'success' ] ) ) || ( $cantonCommuneQualifier[ 'success' ] !== 1 ) ) {
-                \file_put_contents( __DIR__ . '/cantonsP3179.error.log', "qualifier failed : {$cantonCommuneClaimId}\t{$qualifier[ 0 ]}\t{$qualifier[ 1 ]}\n",
+                \file_put_contents( __DIR__ . '/cantonsP3179.error.log', "qualifier failed : {$cantonCommuneClaimId}\t{$qualifier[0]}\t{$qualifier[1]}\n",
                         \FILE_APPEND );
             }
         }
         // Finally add a P794 qualifier to the new claim
-        $cantonCommuneAs = \json_decode( $api->request( 'POST', 'w/api.php',
-                        [ 'form_params' =>
+        $cantonCommuneAs = \json_decode( $api->request( 'POST', 'w/api.php', [
+                        'form_params' =>
                     [
                         'action'   => 'wbsetqualifier',
                         'claim'    => $cantonCommuneClaimId,
